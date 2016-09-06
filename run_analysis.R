@@ -16,8 +16,8 @@ library(dplyr)
 
 # read and process the test and train datasets, and create a summary by activity/subject
 create_summary <- function() {
-  # read the activity labels into a table
-  actlabels <- read.table("UCI HAR Dataset\\activity_labels.txt")
+  # read the activity labels into a table - 2-columns: id, name
+  actlabels <- read.table("UCI HAR Dataset\\activity_labels.txt",col.names=c("activity_id", "activity"))
 
   # read column names for the main data file from "features.txt"
   # note: this file contains some duplicate column names
@@ -46,16 +46,11 @@ create_summary <- function() {
   testtbl <- tbl_df(testdf)
   
   # read the test activity file - a single-column of data
-  testactdf <- read.table("UCI HAR Dataset\\test\\y_test.txt")
-  # merge with the activity labels
-  testactdf<-merge(testactdf,actlabels)
-  # add the activity column to the main data tbl
-  testtbl<-mutate(testtbl,activity=testactdf[,2])
-  
+  testact <- read.table("UCI HAR Dataset\\test\\y_test.txt", col.names = c("activity_id"))
   # read the subject file
-  testsubj <- read.table("UCI HAR Dataset\\test\\subject_test.txt")
-  # add the subject column to the main data tbl
-  testtbl<-mutate(testtbl,subject=testsubj[,1])
+  testsubj <- read.table("UCI HAR Dataset\\test\\subject_test.txt", col.names = c("subject"))
+  # add the activity_id and subject columns to the main data tbl
+  testtbl <- testtbl %>% mutate(activity_id=testact$activity_id, subject=testsubj$subject)
   
   # for testing, comment out the following two lines - "train" is a bigger dataset
   # read the train data file
@@ -72,28 +67,28 @@ create_summary <- function() {
   traintbl <- tbl_df(traindf)
   
   # read the train activity file - a single-column of data
-  trainactdf <- read.table("UCI HAR Dataset\\train\\y_train.txt")
-  # merge with the activity labels
-  trainactdf<-merge(trainactdf,actlabels)
-  # add the activity column to the main data tbl
-  traintbl<-mutate(traintbl,activity=trainactdf[,2])
-  
-  # read the subject file
-  trainsubj <- read.table("UCI HAR Dataset\\train\\subject_train.txt")
-  # add the subject column to the main data tbl
-  traintbl<-mutate(traintbl,subject=trainsubj[,1])
+  trainactdf <- read.table("UCI HAR Dataset\\train\\y_train.txt",col.names = c("activity_id"))
+  # read the train subject file - a single column
+  trainsubj <- read.table("UCI HAR Dataset\\train\\subject_train.txt", col.names = c("subject"))
+  # add the activity_id and subject columns to the main data tbl
+  traintbl <- traintbl %>% mutate(activity_id=trainactdf$activity_id, subject=trainsubj$subject)
 
   
   # combine the test and train datasets
   combined <- rbind(testtbl, traintbl)
+   
+  # merge with the activity labels
+  combined <- combined %>% merge(actlabels,by.x="activity_id",by.y="activity_id")
+  # drop the activity_id column
+  combined <- combined %>% select(-activity_id)
   
   # group by activity and subject, for the following summarization
-  combined<-group_by(combined,activity,subject)
-  # create the new dataset by summarizing every variable except the group_by vars
-  newtbl <- summarize_each(combined, funs(mean))
+  combined <- combined %>% group_by(activity,subject)
   
-  write.table(newtbl,"UCI HAR Dataset\\summary_by_activity_subject.txt",row.name=FALSE)
+  # create the new dataset by summarizing every variable except the group_by vars
+  newtbl <- summarize_each(combined, funs(mean(., rm.na=TRUE)))
+  
+  write.table(newtbl,"UCI HAR Dataset\\summary_by_activity_subject2.txt",row.name=FALSE)
 
   return("Success!")
 }
-
